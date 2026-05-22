@@ -57,3 +57,4 @@ Original prompt: we need to make a web based video game using game-studio:web-ga
 - Drove bob/stride from movement gait instead of raw wall-clock time.
 - Added a subtle turn lean and exposed the facing vector in `render_game_to_text()`.
 - Follow-up correction: removed whole-character/body rotation because it made the side pose turn upside down. Porpeta now renders as four fixed cardinal poses only: left, right, up/back, and down/front.
+- Follow-up correction: swapped the vertical pose mapping after visual review showed up/down were reversed.

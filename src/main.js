@@ -578,7 +578,7 @@ function drawSideCat(dir, bob, stride, stretch, lean) {
 }
 
 function drawVerticalCat(dir, bob, stride, lean) {
-  const lookingDown = dir === "down";
+  const lookingDown = dir === "up";
   const sway = clamp(lean * 8, -2.5, 2.5);
   const bodyW = lookingDown ? 26 : 24;
   const headY = lookingDown ? -26 + bob : 26 + bob;
