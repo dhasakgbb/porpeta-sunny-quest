@@ -495,24 +495,36 @@ function drawCat(player) {
 
   ctx.save();
   ctx.translate(player.x, player.y);
-  const facingAngle = Math.atan2(player.facingY || 0, player.facingX || 1);
-  ctx.rotate(facingAngle);
   const moving = player.speedVisual > 10;
   const bob = Math.sin(player.gait * Math.PI * 2) * (moving ? 2.5 : 0.6);
   const stretch = player.pounce > 0 ? 1.2 : 1;
   const lean = clamp(player.turnLean || 0, -0.28, 0.28);
+  const stride = Math.sin(player.gait * Math.PI * 2) * (moving ? 8 : 2);
 
   ctx.fillStyle = "rgba(55, 37, 24, 0.16)";
   ctx.beginPath();
-  ctx.ellipse(0, 30, 38 * stretch, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 30, player.dir === "up" || player.dir === "down" ? 24 : 38 * stretch, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  if (player.dir === "up" || player.dir === "down") {
+    drawVerticalCat(player.dir, bob, stride, lean);
+  } else {
+    drawSideCat(player.dir, bob, stride, stretch, lean);
+  }
+  ctx.restore();
+}
+
+function drawSideCat(dir, bob, stride, stretch, lean) {
+  const flip = dir === "left" ? -1 : 1;
+  const sway = clamp(lean * 10, -3, 3);
+  ctx.save();
+  ctx.scale(flip, 1);
   ctx.fillStyle = "#fff8ed";
   ctx.beginPath();
-  ctx.ellipse(0, bob, 34 * stretch, 18, lean, 0, Math.PI * 2);
+  ctx.ellipse(sway, bob, 34 * stretch, 18, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(34 * stretch, -8 + bob, 17, 15, lean + 0.05, 0, Math.PI * 2);
+  ctx.ellipse(34 * stretch + sway, -8 + bob, 17, 15, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "#2d241f";
@@ -536,14 +548,14 @@ function drawCat(player) {
 
   ctx.fillStyle = "#d78143";
   ctx.beginPath();
-  ctx.ellipse(-11 * stretch, -11 + bob, 15, 11, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(-11 * stretch + sway, -11 + bob, 15, 11, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(35 * stretch, -17 + bob, 10, 9, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(35 * stretch + sway, -17 + bob, 10, 9, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#5c4b42";
   ctx.beginPath();
-  ctx.ellipse(10 * stretch, -3 + bob, 9, 7, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(10 * stretch + sway, -3 + bob, 9, 7, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "#5f4a3c";
@@ -556,11 +568,86 @@ function drawCat(player) {
 
   ctx.strokeStyle = "#fff8ed";
   ctx.lineWidth = 5;
-  const stride = Math.sin(player.gait * Math.PI * 2) * (moving ? 8 : 2);
   for (const lx of [-17, 8, 25]) {
     ctx.beginPath();
     ctx.moveTo(lx * stretch, 12 + bob);
     ctx.lineTo((lx + stride / 2) * stretch, 29 + bob);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawVerticalCat(dir, bob, stride, lean) {
+  const lookingDown = dir === "down";
+  const sway = clamp(lean * 8, -2.5, 2.5);
+  const bodyW = lookingDown ? 26 : 24;
+  const headY = lookingDown ? -26 + bob : 26 + bob;
+  const earY = lookingDown ? -42 + bob : 42 + bob;
+  const bodyY = bob;
+
+  ctx.save();
+  ctx.fillStyle = "#fff8ed";
+  ctx.beginPath();
+  ctx.ellipse(sway, bodyY, bodyW, 38, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#d78143";
+  ctx.beginPath();
+  ctx.ellipse(9 + sway, bodyY + 6, 12, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#5c4b42";
+  ctx.beginPath();
+  ctx.ellipse(-9 + sway, bodyY - 11, 8, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#fff8ed";
+  ctx.beginPath();
+  ctx.ellipse(sway, headY, 18, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#f5b1a4";
+  ctx.beginPath();
+  ctx.moveTo(-12, headY - (lookingDown ? 8 : -8));
+  ctx.lineTo(-22, earY);
+  ctx.lineTo(-4, headY - (lookingDown ? 12 : -12));
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(12, headY - (lookingDown ? 8 : -8));
+  ctx.lineTo(22, earY);
+  ctx.lineTo(4, headY - (lookingDown ? 12 : -12));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#d78143";
+  ctx.beginPath();
+  ctx.ellipse(8, headY - (lookingDown ? 6 : -6), 10, 8, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (lookingDown) {
+    ctx.fillStyle = "#2d241f";
+    ctx.beginPath();
+    ctx.arc(-6, headY - 2, 2.2, 0, Math.PI * 2);
+    ctx.arc(7, headY - 2, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "#5f4a3c";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  const tailBaseY = lookingDown ? 25 + bob : -25 + bob;
+  const tailEndY = lookingDown ? 54 + bob : -54 + bob;
+  ctx.moveTo(-10, tailBaseY);
+  ctx.quadraticCurveTo(-35, tailBaseY + (lookingDown ? 10 : -10), -24, tailEndY);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#fff8ed";
+  ctx.lineWidth = 5;
+  for (const lx of [-11, 11]) {
+    ctx.beginPath();
+    ctx.moveTo(lx, lookingDown ? 8 + bob : -8 + bob);
+    ctx.lineTo(lx + stride * 0.25, lookingDown ? 31 + bob : -31 + bob);
     ctx.stroke();
   }
   ctx.restore();
