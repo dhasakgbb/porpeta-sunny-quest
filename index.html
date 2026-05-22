@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Porpeta's Sunny Quest</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main id="game-shell" aria-label="Porpeta's Sunny Quest game">
+      <canvas id="game-canvas" width="960" height="540" aria-label="Game playfield"></canvas>
+
+      <button id="audio-toggle" class="audio-toggle" type="button" aria-pressed="false">Music On</button>
+
+      <section id="menu" class="panel" aria-live="polite">
+        <p class="eyebrow">Porpeta's Sunny Quest</p>
+        <h1>Porpeta's tiny adventure</h1>
+        <div class="title-video-frame">
+          <video
+            id="title-video"
+            src="./assets/video/porpeta-title.mp4"
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            aria-label="Porpeta title video"
+          ></video>
+        </div>
+        <p class="menu-copy">Sneak past the sleeper, chase the red lights, then find the warmest spot in the whole house.</p>
+        <button id="start-btn" type="button">Start</button>
+        <p class="controls">Move: WASD or arrows · Sneak: Shift or B · Pounce: Space · Fullscreen: F</p>
+      </section>
+
+      <div id="hud" class="hud" hidden>
+        <div class="hud-chip">
+          <span id="level-label">Level 1</span>
+          <strong id="objective-label">Reach the food bowl.</strong>
+        </div>
+        <div class="hud-chip compact">
+          <span id="score-label">0/5</span>
+        </div>
+      </div>
+
+      <section id="ending" class="panel ending" hidden aria-live="polite">
+        <h2>Thank you for being my best friend.</h2>
+        <button id="restart-btn" type="button">Play again</button>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
