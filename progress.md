@@ -66,3 +66,12 @@ Original prompt: we need to make a web based video game using game-studio:web-ga
 - Added a visible settling ring around the bedroom sun patch.
 - Added small in-world labels for the food bowl, laser count, and warm spot.
 - Tuned the laser count label to avoid overlapping the Living Room intro banner.
+
+## 2026-05-22 Laser pounce gameplay
+
+- Reworked Level 2 into a stalk-and-pounce mini-game.
+- Porpeta now moves slowly in the Living Room, and Space launches a short committed pounce dash with cooldown.
+- The laser dot glides smoothly toward targets and gently evades Porpeta when she gets close without pouncing.
+- Catching the laser now requires being in a pounce, while pointer/tap catch remains as an accessibility fallback.
+- Added a faint laser beam line and exposed pounce/laser target state in `render_game_to_text()`.
+- Added a tiny Porpeta favicon so the title screen loads without a browser 404.

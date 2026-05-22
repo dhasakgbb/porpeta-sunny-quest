@@ -28,6 +28,18 @@ const laserPositions = [
   { x: 820, y: 285 },
 ];
 
+function makeLaserDot(index, x = laserPositions[index].x, y = laserPositions[index].y) {
+  return {
+    x,
+    y,
+    targetX: laserPositions[index].x,
+    targetY: laserPositions[index].y,
+    baseIndex: index,
+    evadeTimer: 0,
+    r: 20,
+  };
+}
+
 function makePlayer(x, y, dir = "right") {
   const facing = directionVector(dir);
   return {
@@ -42,6 +54,10 @@ function makePlayer(x, y, dir = "right") {
     speedVisual: 0,
     turnLean: 0,
     pounce: 0,
+    pounceCooldown: 0,
+    pounceVx: 0,
+    pounceVy: 0,
+    wasPounceInput: false,
     curled: false,
   };
 }
@@ -61,7 +77,8 @@ const state = {
   },
   livingRoom: {
     caught: 0,
-    currentDot: { ...laserPositions[0], r: 20 },
+    currentDot: makeLaserDot(0),
+    captureCooldown: 0,
     sparkle: 0,
   },
   bedroom: {
@@ -88,7 +105,8 @@ function resetGame() {
   state.player = makePlayer(100, 400);
   state.kitchen.wake = 0;
   state.livingRoom.caught = 0;
-  state.livingRoom.currentDot = { ...laserPositions[0], r: 20 };
+  state.livingRoom.currentDot = makeLaserDot(0);
+  state.livingRoom.captureCooldown = 0;
   state.livingRoom.sparkle = 0;
   state.bedroom.settled = 0;
   menu.hidden = false;
@@ -121,8 +139,9 @@ function resetLevel(level) {
   } else if (level === 2) {
     Object.assign(state.player, makePlayer(118, 330));
     state.livingRoom.caught = 0;
-    state.livingRoom.currentDot = { ...laserPositions[0], r: 20 };
-    showBanner("Living Room", "Catch five red lights.");
+    state.livingRoom.currentDot = makeLaserDot(0);
+    state.livingRoom.captureCooldown = 0;
+    showBanner("Living Room", "Stalk, then pounce with Space.");
   } else {
     Object.assign(state.player, makePlayer(140, 360));
     state.bedroom.settled = 0;
@@ -153,12 +172,12 @@ function update(dt) {
   if (state.mode !== "playing") return;
 
   const input = readInput();
-  const wasPouncing = state.player.pounce > 0;
   state.player.pounce = Math.max(0, state.player.pounce - dt);
+  state.player.pounceCooldown = Math.max(0, state.player.pounceCooldown - dt);
   updatePlayer(dt, input);
 
   if (state.level === 1) updateKitchen(dt, input);
-  if (state.level === 2) updateLivingRoom(dt, wasPouncing);
+  if (state.level === 2) updateLivingRoom(dt);
   if (state.level === 3) updateBedroom(dt);
   updateHud();
 }
@@ -181,12 +200,24 @@ function readInput() {
 function updatePlayer(dt, input) {
   const player = state.player;
   const mag = Math.hypot(input.x, input.y) || 1;
-  const baseSpeed = input.sneak ? 92 : 162;
-  const pounceBoost = input.pounce && state.level !== 1 ? 1.75 : 1;
-  if (input.pounce && state.level !== 1) player.pounce = 0.22;
+  const baseSpeed = state.level === 2 ? 82 : input.sneak ? 92 : 162;
+  const pounceStarted = input.pounce && !player.wasPounceInput && player.pounceCooldown <= 0;
+  if (pounceStarted && state.level === 2) {
+    const launchX = Math.abs(input.x) + Math.abs(input.y) > 0 ? input.x / mag : player.facingX || 1;
+    const launchY = Math.abs(input.x) + Math.abs(input.y) > 0 ? input.y / mag : player.facingY || 0;
+    player.pounce = 0.34;
+    player.pounceCooldown = 0.72;
+    player.pounceVx = launchX * 470;
+    player.pounceVy = launchY * 470;
+  } else if (pounceStarted && state.level !== 1) {
+    player.pounce = 0.22;
+  }
+  player.wasPounceInput = input.pounce;
 
-  player.vx = (input.x / mag) * baseSpeed * pounceBoost;
-  player.vy = (input.y / mag) * baseSpeed * pounceBoost;
+  player.pounceVx *= Math.exp(-dt * 5.2);
+  player.pounceVy *= Math.exp(-dt * 5.2);
+  player.vx = (input.x / mag) * baseSpeed + player.pounceVx;
+  player.vy = (input.y / mag) * baseSpeed + player.pounceVy;
   updatePlayerFacing(player, input, dt);
 
   const next = { x: player.x + player.vx * dt, y: player.y + player.vy * dt };
@@ -241,21 +272,41 @@ function updateKitchen(dt, input) {
 
 function updateLivingRoom(dt) {
   const dot = state.livingRoom.currentDot;
-  dot.x += Math.sin(state.time * 2.8 + state.livingRoom.caught) * 18 * dt;
-  dot.y += Math.cos(state.time * 2.4 + state.livingRoom.caught) * 14 * dt;
+  state.livingRoom.captureCooldown = Math.max(0, state.livingRoom.captureCooldown - dt);
+  dot.evadeTimer = Math.max(0, dot.evadeTimer - dt);
+  const distanceToCat = dist(state.player, dot);
+  const catIsPouncing = state.player.pounce > 0;
+  if (distanceToCat < 118 && !catIsPouncing && dot.evadeTimer <= 0) {
+    const awayX = (dot.x - state.player.x) / (distanceToCat || 1);
+    const awayY = (dot.y - state.player.y) / (distanceToCat || 1);
+    dot.targetX = clamp(dot.x + awayX * 130 + Math.sin(state.time * 3) * 35, 100, WIDTH - 100);
+    dot.targetY = clamp(dot.y + awayY * 96 + Math.cos(state.time * 2.7) * 28, 125, HEIGHT - 85);
+    dot.evadeTimer = 0.78;
+  } else if (dot.evadeTimer <= 0 && dist(dot, { x: dot.targetX, y: dot.targetY }) < 16) {
+    dot.targetX = laserPositions[dot.baseIndex].x + Math.sin(state.time * 1.3 + dot.baseIndex) * 45;
+    dot.targetY = laserPositions[dot.baseIndex].y + Math.cos(state.time * 1.1 + dot.baseIndex) * 34;
+  }
+
+  const glide = 1 - Math.exp(-dt * 3.8);
+  dot.x += (dot.targetX - dot.x) * glide;
+  dot.y += (dot.targetY - dot.y) * glide;
+  dot.x += Math.sin(state.time * 8 + state.livingRoom.caught) * 5 * dt;
+  dot.y += Math.cos(state.time * 7 + state.livingRoom.caught) * 4 * dt;
   dot.x = clamp(dot.x, 80, WIDTH - 80);
   dot.y = clamp(dot.y, 110, HEIGHT - 70);
   state.livingRoom.sparkle = Math.max(0, state.livingRoom.sparkle - dt);
 
-  if (dist(state.player, dot) < CAT_R + dot.r || pointerCatch(dot)) {
+  const canCapture = state.livingRoom.captureCooldown <= 0;
+  if (canCapture && ((catIsPouncing && distanceToCat < CAT_R + dot.r + 12) || pointerCatch(dot))) {
     state.livingRoom.caught += 1;
     state.livingRoom.sparkle = 0.38;
+    state.livingRoom.captureCooldown = 0.34;
     spawnLaserCatch(dot.x, dot.y);
     Object.assign(state.player, { x: dot.x - 16, y: dot.y + 8, pounce: 0.2 });
     if (state.livingRoom.caught >= 5) {
       nextLevel();
     } else {
-      state.livingRoom.currentDot = { ...laserPositions[state.livingRoom.caught], r: 20 };
+      state.livingRoom.currentDot = makeLaserDot(state.livingRoom.caught, dot.x, dot.y);
     }
   }
 }
@@ -484,6 +535,14 @@ function drawPlant(x, y) {
 
 function drawLaserDot(dot, sparkle) {
   const pulse = 1 + Math.sin(state.time * 12) * 0.18 + sparkle * 0.8;
+  ctx.strokeStyle = "rgba(225,38,52,0.18)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 12]);
+  ctx.beginPath();
+  ctx.moveTo(WIDTH - 36, 104);
+  ctx.lineTo(dot.x, dot.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
   ctx.strokeStyle = "rgba(219,36,45,0.18)";
   ctx.lineWidth = 22 * pulse;
   ctx.beginPath();
@@ -1005,7 +1064,17 @@ function renderGameToText() {
         ? {
             caught: state.livingRoom.caught,
             required: 5,
-            laserDot: { x: Math.round(dot.x), y: Math.round(dot.y), r: dot.r },
+            pounceCooldown: Number(state.player.pounceCooldown.toFixed(2)),
+            pouncing: state.player.pounce > 0,
+            captureCooldown: Number(state.livingRoom.captureCooldown.toFixed(2)),
+            laserDot: {
+              x: Math.round(dot.x),
+              y: Math.round(dot.y),
+              targetX: Math.round(dot.targetX),
+              targetY: Math.round(dot.targetY),
+              evadeTimer: Number(dot.evadeTimer.toFixed(2)),
+              r: dot.r,
+            },
           }
         : undefined,
     bedroom:

@@ -7,6 +7,8 @@
     { "buttons": ["down"], "frames": 23 },
     { "buttons": ["left"], "frames": 14 },
     { "buttons": ["right"], "frames": 64 },
-    { "buttons": ["up"], "frames": 68 }
+    { "buttons": ["up"], "frames": 68 },
+    { "buttons": ["right", "up", "space"], "frames": 16 },
+    { "buttons": [], "frames": 16 }
   ]
 }
