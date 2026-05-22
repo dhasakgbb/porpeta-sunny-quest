@@ -483,17 +483,84 @@ function drawWakeZone(human, wake) {
 }
 
 function drawSleepingHuman(human, wake) {
-  roundRect(human.x, human.y, human.w, human.h, 28, "#7d604d");
-  roundRect(human.x + 20, human.y + 14, human.w - 36, human.h - 24, 22, "#f1d9b6");
+  const breathe = Math.sin(state.time * 1.55) * (1 - wake * 0.45);
+  const twitch = wake > 0.45 ? Math.sin(state.time * 12) * wake * 2.5 : 0;
+  const bedX = human.x;
+  const bedY = human.y;
+  const bedW = human.w;
+  const bedH = human.h;
+  const centerY = bedY + bedH / 2;
+
+  ctx.save();
+  ctx.translate(twitch, 0);
+  roundRect(bedX - 8, bedY - 8, bedW + 16, bedH + 16, 32, "#7d604d");
+  roundRect(bedX + 9, bedY + 6, bedW - 18, bedH - 10, 26, "#f4dcb8");
+
+  roundRect(bedX + 16, bedY + 14, 82, bedH - 26, 24, "#fff2d4");
+  ctx.fillStyle = "rgba(116,91,75,0.12)";
+  ctx.beginPath();
+  ctx.ellipse(bedX + 58, centerY + 4, 32, 18, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(bedX + 136, centerY + 3);
+  ctx.scale(1 + breathe * 0.018, 1 + breathe * 0.055);
+  roundRect(-54, -30, bedW - 100, 62, 28, "#8da778");
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  roundRect(-36, -22, bedW - 140, 18, 12, "rgba(255,255,255,0.2)");
+  ctx.strokeStyle = "rgba(69,111,76,0.45)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-30, 26);
+  ctx.bezierCurveTo(24, 40 + breathe * 2, 82, 39 + breathe * 2, 134, 26);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = "#f0bd96";
+  ctx.beginPath();
+  ctx.ellipse(bedX + 72, centerY + 3, 25, 20, -0.18, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = "#5d4037";
   ctx.beginPath();
-  ctx.ellipse(human.x + 58, human.y + 38, 30, 22, -0.15, 0, Math.PI * 2);
+  ctx.ellipse(bedX + 62, centerY - 6, 27, 18, -0.2, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#2d241f";
-  ctx.font = "bold 24px ui-rounded, system-ui";
-  ctx.fillText(wake > 0.55 ? "Z?" : "Zzz", human.x + human.w - 64, human.y - 14);
+  ctx.strokeStyle = "#5d4037";
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(bedX + 80, centerY + 5, 3.4, 0.15, Math.PI - 0.15);
+  ctx.stroke();
+  ctx.strokeStyle = "#8b5f4f";
+  ctx.beginPath();
+  ctx.moveTo(bedX + 95, centerY + 12);
+  ctx.quadraticCurveTo(bedX + 120, centerY + 27 + breathe * 2, bedX + 145, centerY + 12);
+  ctx.stroke();
+
+  ctx.fillStyle = "#f0bd96";
+  ctx.beginPath();
+  ctx.ellipse(bedX + 143, centerY + 13, 8, 6, 0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawSleepLetters(bedX + bedW - 42, bedY - 20, wake);
   ctx.fillStyle = "#9b2f45";
   ctx.fillRect(human.x, human.y + human.h + 12, human.w * wake, 7);
+  ctx.restore();
+}
+
+function drawSleepLetters(x, y, wake) {
+  const letters = wake > 0.58 ? ["Z", "?", "!"] : ["Z", "z", "z"];
+  for (let i = 0; i < letters.length; i += 1) {
+    const phase = state.time * 1.8 + i * 1.15;
+    const lift = (phase % Math.PI) / Math.PI;
+    const px = x + i * 24 + Math.sin(phase) * 5;
+    const py = y - lift * 16 + Math.cos(phase * 1.2) * 3;
+    const size = 29 - i * 4 + lift * 4;
+    ctx.globalAlpha = 0.32 + (1 - lift) * 0.55 + wake * 0.18;
+    ctx.fillStyle = wake > 0.58 ? "#7d2f3d" : "#2d241f";
+    ctx.font = `900 ${size}px ui-rounded, system-ui`;
+    ctx.fillText(letters[i], px, py);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawFoodBowl(bowl) {
