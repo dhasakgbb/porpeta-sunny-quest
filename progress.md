@@ -42,3 +42,17 @@ Original prompt: we need to make a web based video game using game-studio:web-ga
 - Validation passed: menu/full game Playwright runs remained green after music changes.
 - Validation passed: DOM probe confirmed title screen video, mute toggle, and post-start music state with no page errors.
 - Rechecked the live title screen at desktop and mobile sizes; tightened the title copy so the video and Start button carry the screen better.
+
+## 2026-05-22 Audible music repair
+
+- Found why the first music pass sounded like silence: note envelopes were routed through a very low shared gain and only fired every 1.35 seconds.
+- Increased the music bus, added separate pad gains, and changed the sequencer to a clearer 430ms melodic loop.
+- Added per-level note patterns and exposed `musicTick`, `lastNote`, `lastAudibleNote`, and `musicGain` in `render_game_to_text()` for test visibility.
+- Renamed the lower-right toggle from Music to Sound because it controls music and purr together.
+
+## 2026-05-22 Main character animation polish
+
+- Replaced instant left/right visual flipping with a smoothed facing vector.
+- Rotated Porpeta's procedural body toward movement direction so up/down/diagonal turns read as fluid turns.
+- Drove bob/stride from movement gait instead of raw wall-clock time.
+- Added a subtle turn lean and exposed the facing vector in `render_game_to_text()`.

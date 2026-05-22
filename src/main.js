@@ -28,12 +28,30 @@ const laserPositions = [
   { x: 820, y: 285 },
 ];
 
+function makePlayer(x, y, dir = "right") {
+  const facing = directionVector(dir);
+  return {
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    dir,
+    facingX: facing.x,
+    facingY: facing.y,
+    gait: 0,
+    speedVisual: 0,
+    turnLean: 0,
+    pounce: 0,
+    curled: false,
+  };
+}
+
 const state = {
   mode: "menu",
   level: 1,
   message: "",
   time: 0,
-  player: { x: 100, y: 400, vx: 0, vy: 0, dir: "right", pounce: 0, curled: false },
+  player: makePlayer(100, 400),
   kitchen: {
     foodBowl: { x: 838, y: 382, r: 32 },
     human: { x: 470, y: 286, w: 230, h: 92, danger: 150 },
@@ -63,7 +81,7 @@ function resetGame() {
   state.level = 1;
   state.message = "";
   state.time = 0;
-  state.player = { x: 100, y: 400, vx: 0, vy: 0, dir: "right", pounce: 0, curled: false };
+  state.player = makePlayer(100, 400);
   state.kitchen.wake = 0;
   state.livingRoom.caught = 0;
   state.livingRoom.currentDot = { ...laserPositions[0], r: 20 };
@@ -93,14 +111,14 @@ function resetLevel(level) {
   state.player.curled = false;
   state.player.pounce = 0;
   if (level === 1) {
-    Object.assign(state.player, { x: 100, y: 400, vx: 0, vy: 0, dir: "right" });
+    Object.assign(state.player, makePlayer(100, 400));
     state.kitchen.wake = 0;
   } else if (level === 2) {
-    Object.assign(state.player, { x: 118, y: 330, vx: 0, vy: 0, dir: "right" });
+    Object.assign(state.player, makePlayer(118, 330));
     state.livingRoom.caught = 0;
     state.livingRoom.currentDot = { ...laserPositions[0], r: 20 };
   } else {
-    Object.assign(state.player, { x: 140, y: 360, vx: 0, vy: 0, dir: "right" });
+    Object.assign(state.player, makePlayer(140, 360));
     state.bedroom.settled = 0;
   }
   retuneMusic();
@@ -160,17 +178,39 @@ function updatePlayer(dt, input) {
 
   player.vx = (input.x / mag) * baseSpeed * pounceBoost;
   player.vy = (input.y / mag) * baseSpeed * pounceBoost;
-  if (Math.abs(player.vx) > Math.abs(player.vy) && Math.abs(player.vx) > 1) {
-    player.dir = player.vx > 0 ? "right" : "left";
-  } else if (Math.abs(player.vy) > 1) {
-    player.dir = player.vy > 0 ? "down" : "up";
-  }
+  updatePlayerFacing(player, input, dt);
 
   const next = { x: player.x + player.vx * dt, y: player.y + player.vy * dt };
   player.x = clamp(next.x, 52, WIDTH - 52);
   player.y = clamp(next.y, 82, HEIGHT - 50);
 
   if (state.level === 1) resolveKitchenHumanCollision();
+}
+
+function updatePlayerFacing(player, input, dt) {
+  const moving = Math.hypot(input.x, input.y) > 0.01;
+  if (moving) {
+    const targetX = input.x / (Math.hypot(input.x, input.y) || 1);
+    const targetY = input.y / (Math.hypot(input.x, input.y) || 1);
+    const turnSpeed = 1 - Math.exp(-dt * 12);
+    const oldAngle = Math.atan2(player.facingY, player.facingX);
+    player.facingX += (targetX - player.facingX) * turnSpeed;
+    player.facingY += (targetY - player.facingY) * turnSpeed;
+    const facingLength = Math.hypot(player.facingX, player.facingY) || 1;
+    player.facingX /= facingLength;
+    player.facingY /= facingLength;
+    const newAngle = Math.atan2(player.facingY, player.facingX);
+    player.turnLean = shortestAngleDelta(oldAngle, newAngle) * 3.2;
+
+    if (Math.abs(targetX) > Math.abs(targetY)) player.dir = targetX > 0 ? "right" : "left";
+    else player.dir = targetY > 0 ? "down" : "up";
+  } else {
+    player.turnLean *= Math.exp(-dt * 9);
+  }
+
+  const speed = Math.hypot(player.vx, player.vy);
+  player.speedVisual += (speed - player.speedVisual) * (1 - Math.exp(-dt * 10));
+  player.gait += (player.speedVisual / 46) * dt;
 }
 
 function updateKitchen(dt, input) {
@@ -183,7 +223,7 @@ function updateKitchen(dt, input) {
 
   if (state.kitchen.wake >= 1) {
     state.message = "The human stirred. Back to the doorway.";
-    Object.assign(state.player, { x: 100, y: 400, vx: 0, vy: 0, dir: "right" });
+    Object.assign(state.player, makePlayer(100, 400));
     state.kitchen.wake = 0.18;
   }
 
@@ -201,7 +241,7 @@ function updateLivingRoom(dt) {
   if (dist(state.player, dot) < CAT_R + dot.r || pointerCatch(dot)) {
     state.livingRoom.caught += 1;
     state.livingRoom.sparkle = 0.38;
-    Object.assign(state.player, { x: dot.x - 16, y: dot.y + 8, pounce: 0.2, dir: "right" });
+    Object.assign(state.player, { x: dot.x - 16, y: dot.y + 8, pounce: 0.2 });
     if (state.livingRoom.caught >= 5) {
       nextLevel();
     } else {
@@ -455,10 +495,12 @@ function drawCat(player) {
 
   ctx.save();
   ctx.translate(player.x, player.y);
-  const flip = player.dir === "left" ? -1 : 1;
-  ctx.scale(flip, 1);
-  const bob = Math.sin(state.time * 12) * (Math.hypot(player.vx, player.vy) > 10 ? 2.5 : 0.6);
+  const facingAngle = Math.atan2(player.facingY || 0, player.facingX || 1);
+  ctx.rotate(facingAngle);
+  const moving = player.speedVisual > 10;
+  const bob = Math.sin(player.gait * Math.PI * 2) * (moving ? 2.5 : 0.6);
   const stretch = player.pounce > 0 ? 1.2 : 1;
+  const lean = clamp(player.turnLean || 0, -0.28, 0.28);
 
   ctx.fillStyle = "rgba(55, 37, 24, 0.16)";
   ctx.beginPath();
@@ -467,10 +509,10 @@ function drawCat(player) {
 
   ctx.fillStyle = "#fff8ed";
   ctx.beginPath();
-  ctx.ellipse(0, bob, 34 * stretch, 18, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, bob, 34 * stretch, 18, lean, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(34 * stretch, -8 + bob, 17, 15, 0.05, 0, Math.PI * 2);
+  ctx.ellipse(34 * stretch, -8 + bob, 17, 15, lean + 0.05, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "#2d241f";
@@ -514,7 +556,7 @@ function drawCat(player) {
 
   ctx.strokeStyle = "#fff8ed";
   ctx.lineWidth = 5;
-  const stride = Math.sin(state.time * 12) * (Math.hypot(player.vx, player.vy) > 10 ? 8 : 2);
+  const stride = Math.sin(player.gait * Math.PI * 2) * (moving ? 8 : 2);
   for (const lx of [-17, 8, 25]) {
     ctx.beginPath();
     ctx.moveTo(lx * stretch, 12 + bob);
@@ -594,13 +636,13 @@ function ensureAudio() {
   const master = ctx.createGain();
   const musicGain = ctx.createGain();
   const purrGain = ctx.createGain();
-  master.gain.value = audioMuted ? 0 : 1;
-  musicGain.gain.value = 0.04;
-  purrGain.gain.value = 0.04;
+  master.gain.value = audioMuted ? 0 : 0.9;
+  musicGain.gain.value = 0.32;
+  purrGain.gain.value = 0.06;
   musicGain.connect(master);
   purrGain.connect(master);
   master.connect(ctx.destination);
-  audio = { ctx, master, musicGain, purrGain, purrNodes: [], music: null };
+  audio = { ctx, master, musicGain, purrGain, purrNodes: [], music: null, lastNote: null, lastAudibleNote: null };
   return audio;
 }
 
@@ -612,13 +654,19 @@ function startMusic() {
 
   const drone = ac.createOscillator();
   const harmony = ac.createOscillator();
+  const droneGain = ac.createGain();
+  const harmonyGain = ac.createGain();
   const filter = ac.createBiquadFilter();
   drone.type = "sine";
   harmony.type = "triangle";
+  droneGain.gain.value = 0.052;
+  harmonyGain.gain.value = 0.032;
   filter.type = "lowpass";
   filter.frequency.value = 900;
-  drone.connect(filter);
-  harmony.connect(filter);
+  drone.connect(droneGain);
+  harmony.connect(harmonyGain);
+  droneGain.connect(filter);
+  harmonyGain.connect(filter);
   filter.connect(setup.musicGain);
   drone.start();
   harmony.start();
@@ -626,53 +674,68 @@ function startMusic() {
   const music = {
     drone,
     harmony,
+    droneGain,
+    harmonyGain,
     filter,
     tick: 0,
-    timer: window.setInterval(() => playMusicNote(), 1350),
+    timer: window.setInterval(() => playMusicNote(), 430),
   };
   setup.music = music;
   retuneMusic();
+  playMusicNote();
+  window.setTimeout(() => playMusicNote(), 180);
 }
 
 function retuneMusic() {
   if (!audio?.music) return;
   const ac = audio.ctx;
-  const target = state.mode === "ending" ? [82.41, 123.47, 720] : state.level === 2 ? [110, 164.81, 1200] : state.level === 3 ? [98, 146.83, 820] : [73.42, 110, 680];
+  const target = state.mode === "ending" ? [82.41, 123.47, 760] : state.level === 2 ? [110, 164.81, 1350] : state.level === 3 ? [98, 146.83, 860] : [73.42, 110, 720];
   audio.music.drone.frequency.setTargetAtTime(target[0], ac.currentTime, 0.16);
   audio.music.harmony.frequency.setTargetAtTime(target[1], ac.currentTime, 0.16);
   audio.music.filter.frequency.setTargetAtTime(target[2], ac.currentTime, 0.16);
+  audio.music.droneGain.gain.setTargetAtTime(state.level === 2 ? 0.035 : 0.052, ac.currentTime, 0.18);
+  audio.music.harmonyGain.gain.setTargetAtTime(state.level === 2 ? 0.024 : 0.032, ac.currentTime, 0.18);
 }
 
 function playMusicNote() {
   if (!audio?.music || audioMuted) return;
   const ac = audio.ctx;
   if (ac.state !== "running") return;
-  const palettes = {
-    1: [293.66, 329.63, 392],
-    2: [440, 523.25, 659.25, 783.99],
-    3: [246.94, 293.66, 369.99],
+  const patterns = {
+    1: [293.66, 0, 329.63, 392, 0, 329.63, 293.66, 246.94],
+    2: [523.25, 659.25, 783.99, 659.25, 587.33, 783.99, 659.25, 523.25],
+    3: [246.94, 293.66, 329.63, 293.66, 369.99, 329.63, 293.66, 246.94],
   };
-  const notes = state.mode === "ending" ? [246.94, 329.63, 392] : palettes[state.level] || palettes[1];
-  const note = notes[audio.music.tick % notes.length];
+  const notes = state.mode === "ending" ? [246.94, 0, 329.63, 392, 0, 329.63, 293.66, 246.94] : patterns[state.level] || patterns[1];
+  const index = audio.music.tick % notes.length;
+  const note = notes[index];
   audio.music.tick += 1;
+  if (!note) {
+    audio.lastNote = { tick: audio.music.tick, note: 0, peak: 0, level: state.level };
+    return;
+  }
 
   const osc = ac.createOscillator();
   const gain = ac.createGain();
-  osc.type = state.level === 2 ? "square" : "sine";
+  osc.type = state.level === 2 ? "triangle" : "sine";
   osc.frequency.value = note;
+  const peak = state.level === 2 ? 0.16 : state.level === 3 ? 0.095 : 0.105;
+  const duration = state.level === 2 ? 0.22 : 0.38;
   gain.gain.setValueAtTime(0.0001, ac.currentTime);
-  gain.gain.exponentialRampToValueAtTime(state.level === 2 ? 0.026 : 0.018, ac.currentTime + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.42);
+  gain.gain.exponentialRampToValueAtTime(peak, ac.currentTime + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration);
   osc.connect(gain);
   gain.connect(audio.musicGain);
   osc.start();
-  osc.stop(ac.currentTime + 0.46);
+  osc.stop(ac.currentTime + duration + 0.04);
+  audio.lastNote = { tick: audio.music.tick, note, peak, level: state.level };
+  audio.lastAudibleNote = audio.lastNote;
 }
 
 function setAudioMuted(nextMuted) {
   audioMuted = nextMuted;
-  if (audio?.master) audio.master.gain.value = audioMuted ? 0 : 1;
-  audioToggle.textContent = audioMuted ? "Music Off" : "Music On";
+  if (audio?.master) audio.master.gain.value = audioMuted ? 0 : 0.9;
+  audioToggle.textContent = audioMuted ? "Sound Off" : "Sound On";
   audioToggle.setAttribute("aria-pressed", String(audioMuted));
 }
 
@@ -724,6 +787,10 @@ function renderGameToText() {
     audio: {
       muted: audioMuted,
       musicPlaying: Boolean(audio?.music),
+      musicTick: audio?.music?.tick || 0,
+      lastNote: audio?.lastNote || null,
+      lastAudibleNote: audio?.lastAudibleNote || null,
+      musicGain: audio ? Number(audio.musicGain.gain.value.toFixed(2)) : 0,
     },
     level: state.level,
     objective: objectives[state.level],
@@ -734,6 +801,10 @@ function renderGameToText() {
       vy: Math.round(state.player.vy),
       radius: CAT_R,
       direction: state.player.dir,
+      facing: {
+        x: Number((state.player.facingX || 0).toFixed(2)),
+        y: Number((state.player.facingY || 0).toFixed(2)),
+      },
       curled: state.player.curled,
     },
     kitchen:
@@ -774,6 +845,17 @@ function screenToCanvas(evt) {
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function directionVector(dir) {
+  if (dir === "left") return { x: -1, y: 0 };
+  if (dir === "up") return { x: 0, y: -1 };
+  if (dir === "down") return { x: 0, y: 1 };
+  return { x: 1, y: 0 };
+}
+
+function shortestAngleDelta(from, to) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function clamp(value, min, max) {
@@ -851,7 +933,7 @@ window.advanceTime = (ms) => {
 };
 window.__ricardoGame = { state, resetGame, startGame, resetLevel, nextLevel };
 
-audioToggle.textContent = "Music On";
+audioToggle.textContent = "Sound On";
 audioToggle.setAttribute("aria-pressed", "false");
 resetGame();
 requestAnimationFrame(frame);

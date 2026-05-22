@@ -24,4 +24,4 @@ Then open `http://localhost:5173`.
 - Sneak: Shift or B
 - Pounce: Space
 - Fullscreen: F
-- Music: toggle with the button in the lower-right corner
+- Sound: toggle with the button in the lower-right corner
