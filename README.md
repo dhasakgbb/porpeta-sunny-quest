@@ -2,6 +2,8 @@
 
 A tiny browser game for Porpeta.
 
+Play it here: https://dhasakgbb.github.io/porpeta-sunny-quest/
+
 Play through three warm little rooms:
 
 - Sneak through the kitchen to reach the food bowl.
