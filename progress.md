@@ -58,3 +58,11 @@ Original prompt: we need to make a web based video game using game-studio:web-ga
 - Added a subtle turn lean and exposed the facing vector in `render_game_to_text()`.
 - Follow-up correction: removed whole-character/body rotation because it made the side pose turn upside down. Porpeta now renders as four fixed cardinal poses only: left, right, up/back, and down/front.
 - Follow-up correction: swapped the vertical pose mapping after visual review showed up/down were reversed.
+
+## 2026-05-22 Ralph polish continuation
+
+- Added short level intro banners to make room transitions legible.
+- Added laser catch burst particles and exposed particle count in `render_game_to_text()`.
+- Added a visible settling ring around the bedroom sun patch.
+- Added small in-world labels for the food bowl, laser count, and warm spot.
+- Tuned the laser count label to avoid overlapping the Living Room intro banner.

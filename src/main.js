@@ -50,7 +50,9 @@ const state = {
   mode: "menu",
   level: 1,
   message: "",
+  banner: { text: "", timer: 0 },
   time: 0,
+  particles: [],
   player: makePlayer(100, 400),
   kitchen: {
     foodBowl: { x: 838, y: 382, r: 32 },
@@ -80,7 +82,9 @@ function resetGame() {
   state.mode = "menu";
   state.level = 1;
   state.message = "";
+  state.banner = { text: "", timer: 0 };
   state.time = 0;
+  state.particles = [];
   state.player = makePlayer(100, 400);
   state.kitchen.wake = 0;
   state.livingRoom.caught = 0;
@@ -113,13 +117,16 @@ function resetLevel(level) {
   if (level === 1) {
     Object.assign(state.player, makePlayer(100, 400));
     state.kitchen.wake = 0;
+    showBanner("Kitchen", "Sneak to the food bowl.");
   } else if (level === 2) {
     Object.assign(state.player, makePlayer(118, 330));
     state.livingRoom.caught = 0;
     state.livingRoom.currentDot = { ...laserPositions[0], r: 20 };
+    showBanner("Living Room", "Catch five red lights.");
   } else {
     Object.assign(state.player, makePlayer(140, 360));
     state.bedroom.settled = 0;
+    showBanner("Bedroom", "Rest in the warm sun.");
   }
   retuneMusic();
   updateHud();
@@ -141,6 +148,8 @@ function nextLevel() {
 
 function update(dt) {
   state.time += dt;
+  state.banner.timer = Math.max(0, state.banner.timer - dt);
+  updateParticles(dt);
   if (state.mode !== "playing") return;
 
   const input = readInput();
@@ -241,6 +250,7 @@ function updateLivingRoom(dt) {
   if (dist(state.player, dot) < CAT_R + dot.r || pointerCatch(dot)) {
     state.livingRoom.caught += 1;
     state.livingRoom.sparkle = 0.38;
+    spawnLaserCatch(dot.x, dot.y);
     Object.assign(state.player, { x: dot.x - 16, y: dot.y + 8, pounce: 0.2 });
     if (state.livingRoom.caught >= 5) {
       nextLevel();
@@ -248,6 +258,37 @@ function updateLivingRoom(dt) {
       state.livingRoom.currentDot = { ...laserPositions[state.livingRoom.caught], r: 20 };
     }
   }
+}
+
+function showBanner(title, subtitle) {
+  state.banner = { text: `${title}: ${subtitle}`, timer: 1.6 };
+}
+
+function spawnLaserCatch(x, y) {
+  for (let i = 0; i < 16; i += 1) {
+    const angle = (i / 16) * Math.PI * 2;
+    const speed = 80 + (i % 4) * 24;
+    state.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.45,
+      maxLife: 0.45,
+      color: i % 2 ? "#e12634" : "#ffd27a",
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (const particle of state.particles) {
+    particle.life -= dt;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vx *= 1 - dt * 2.2;
+    particle.vy *= 1 - dt * 2.2;
+  }
+  state.particles = state.particles.filter((particle) => particle.life > 0);
 }
 
 function pointerCatch(dot) {
@@ -293,7 +334,9 @@ function render() {
   if (state.level === 1) drawKitchen();
   if (state.level === 2) drawLivingRoom();
   if (state.level === 3) drawBedroom();
+  drawParticles();
   drawCat(state.player);
+  if (state.banner.timer > 0 && state.mode === "playing") drawBanner();
   if (state.message && state.mode === "playing") drawToast(state.message);
   if (state.mode === "menu") drawTitleBackdrop();
 }
@@ -309,6 +352,7 @@ function drawKitchen() {
   drawWakeZone(human, wake);
   drawSleepingHuman(human, wake);
   drawFoodBowl(foodBowl);
+  drawWorldLabel("Dinner", foodBowl.x, foodBowl.y - 42);
 }
 
 function drawLivingRoom() {
@@ -318,6 +362,9 @@ function drawLivingRoom() {
   drawPlant(790, 130);
   drawRug(342, 292, 292, 130, "#456f94", "#f0d59c");
   drawLaserDot(state.livingRoom.currentDot, state.livingRoom.sparkle);
+  if (state.banner.timer <= 0.2) {
+    drawWorldLabel(`${state.livingRoom.caught}/5`, state.livingRoom.currentDot.x, state.livingRoom.currentDot.y - 42);
+  }
 }
 
 function drawBedroom() {
@@ -325,6 +372,7 @@ function drawBedroom() {
   drawFloorboards();
   drawBed();
   drawSunPatch(state.bedroom.sunPatch);
+  drawWorldLabel("Warm spot", state.bedroom.sunPatch.x, state.bedroom.sunPatch.y - 90);
   drawWindowLight();
 }
 
@@ -408,6 +456,15 @@ function drawFoodBowl(bowl) {
   ctx.fill();
 }
 
+function drawWorldLabel(text, x, y) {
+  ctx.font = "800 15px ui-rounded, system-ui";
+  const metrics = ctx.measureText(text);
+  const w = metrics.width + 24;
+  roundRect(x - w / 2, y - 18, w, 28, 8, "rgba(255,249,239,0.78)");
+  ctx.fillStyle = "#2d241f";
+  ctx.fillText(text, x - metrics.width / 2, y + 1);
+}
+
 function drawSofa(x, y, w, h) {
   roundRect(x, y + 25, w, h, 18, "#8da778");
   roundRect(x + 24, y, w - 48, 72, 14, "#9fb98d");
@@ -474,6 +531,20 @@ function drawSunPatch(patch) {
   ctx.beginPath();
   ctx.ellipse(patch.x, patch.y, patch.rx, patch.ry, -0.18, 0, Math.PI * 2);
   ctx.fill();
+
+  const progress = Math.min(1, state.bedroom.settled / 1.2);
+  if (state.level === 3 && state.mode === "playing") {
+    ctx.strokeStyle = "rgba(155, 47, 69, 0.3)";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(patch.x, patch.y, 58, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255, 248, 234, 0.76)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(patch.x, patch.y, 58, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 function drawWindowLight() {
@@ -698,6 +769,31 @@ function drawToast(text) {
   ctx.fillText(text, WIDTH / 2 - metrics.width / 2, HEIGHT - 45);
 }
 
+function drawBanner() {
+  const alpha = Math.min(1, state.banner.timer / 0.3, (1.6 - state.banner.timer) / 0.25);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.font = "800 22px ui-rounded, system-ui";
+  const metrics = ctx.measureText(state.banner.text);
+  const w = Math.min(WIDTH - 160, metrics.width + 44);
+  roundRect(WIDTH / 2 - w / 2, 108, w, 48, 8, "rgba(255,249,239,0.92)");
+  ctx.fillStyle = "#2d241f";
+  ctx.fillText(state.banner.text, WIDTH / 2 - metrics.width / 2, 139);
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const particle of state.particles) {
+    const alpha = Math.max(0, particle.life / particle.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = particle.color;
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, 3 + alpha * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawTitleBackdrop() {
   ctx.fillStyle = "rgba(255,248,234,0.24)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -879,6 +975,8 @@ function renderGameToText() {
       lastAudibleNote: audio?.lastAudibleNote || null,
       musicGain: audio ? Number(audio.musicGain.gain.value.toFixed(2)) : 0,
     },
+    banner: state.banner.timer > 0 ? state.banner.text : "",
+    particles: state.particles.length,
     level: state.level,
     objective: objectives[state.level],
     player: {
