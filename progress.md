@@ -41,3 +41,4 @@ Original prompt: we need to make a web based video game using game-studio:web-ga
 - Added `README.md` with local run instructions and controls.
 - Validation passed: menu/full game Playwright runs remained green after music changes.
 - Validation passed: DOM probe confirmed title screen video, mute toggle, and post-start music state with no page errors.
+- Rechecked the live title screen at desktop and mobile sizes; tightened the title copy so the video and Start button carry the screen better.

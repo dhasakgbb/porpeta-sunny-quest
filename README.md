@@ -1,6 +1,6 @@
 # Porpeta's Sunny Quest
 
-A tiny browser game for Porpeta.
+A tiny browser game for Porpeta, with a real Porpeta title video, gentle music, and one very important sunny nap.
 
 Play it here: https://dhasakgbb.github.io/porpeta-sunny-quest/
 
