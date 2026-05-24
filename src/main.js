@@ -77,7 +77,8 @@ const state = {
   mode: "menu",
   level: 1,
   message: "",
-  banner: { text: "", timer: 0 },
+  banner: { title: "", subtitle: "", timer: 0 },
+  transition: { active: false, fadingOut: false, timer: 0, alpha: 0, targetLevel: null, targetAction: null },
   time: 0,
   particles: [],
   player: makePlayer(100, 400),
@@ -110,7 +111,8 @@ function resetGame() {
   state.mode = "menu";
   state.level = 1;
   state.message = "";
-  state.banner = { text: "", timer: 0 };
+  state.banner = { title: "", subtitle: "", timer: 0 };
+  state.transition = { active: false, fadingOut: false, timer: 0, alpha: 0, targetLevel: null, targetAction: null };
   state.time = 0;
   state.particles = [];
   state.player = makePlayer(100, 400);
@@ -140,6 +142,21 @@ function startGame() {
 }
 
 function resetLevel(level) {
+  if (manualClock) {
+    executeResetLevel(level);
+  } else {
+    state.transition = {
+      active: true,
+      fadingOut: true,
+      timer: 0,
+      alpha: 0,
+      targetLevel: level,
+      targetAction: null
+    };
+  }
+}
+
+function executeResetLevel(level) {
   state.level = level;
   state.mode = "playing";
   state.message = "";
@@ -195,21 +212,60 @@ function nextLevel() {
   if (state.level < 3) {
     resetLevel(state.level + 1);
   } else {
-    state.mode = "ending";
-    state.player.curled = true;
-    state.message = "Thank you for being my best friend.";
-    ending.hidden = false;
-    hud.hidden = true;
-    if (touchControls) touchControls.hidden = true;
-    retuneMusic();
-    playPurr();
+    if (manualClock) {
+      executeEndingTransition();
+    } else {
+      state.transition = {
+        active: true,
+        fadingOut: true,
+        timer: 0,
+        alpha: 0,
+        targetLevel: null,
+        targetAction: executeEndingTransition
+      };
+    }
   }
+}
+
+function executeEndingTransition() {
+  state.mode = "ending";
+  state.player.curled = true;
+  state.message = "Thank you for being my best friend.";
+  ending.hidden = false;
+  hud.hidden = true;
+  if (touchControls) touchControls.hidden = true;
+  retuneMusic();
+  playPurr();
 }
 
 function update(dt) {
   state.time += dt;
   state.banner.timer = Math.max(0, state.banner.timer - dt);
   updateParticles(dt);
+
+  // Tick the screen transition
+  if (state.transition && state.transition.active) {
+    state.transition.timer += dt;
+    const dur = 0.25; // 250ms half-transition duration
+    if (state.transition.fadingOut) {
+      state.transition.alpha = Math.min(1, state.transition.timer / dur);
+      if (state.transition.alpha >= 1) {
+        state.transition.fadingOut = false;
+        state.transition.timer = 0;
+        if (state.transition.targetLevel !== null) {
+          executeResetLevel(state.transition.targetLevel);
+        } else if (state.transition.targetAction) {
+          state.transition.targetAction();
+        }
+      }
+    } else {
+      state.transition.alpha = Math.max(0, 1 - state.transition.timer / dur);
+      if (state.transition.alpha <= 0) {
+        state.transition.active = false;
+      }
+    }
+  }
+
   if (state.mode !== "playing") return;
 
   const input = readInput();
@@ -375,7 +431,7 @@ function updateLivingRoom(dt) {
 }
 
 function showBanner(title, subtitle) {
-  state.banner = { text: `${title}: ${subtitle}`, timer: 1.6 };
+  state.banner = { title, subtitle, timer: 2.2 };
 }
 
 function spawnLaserCatch(x, y) {
@@ -473,6 +529,15 @@ function render() {
   if (state.banner.timer > 0 && state.mode === "playing") drawBanner();
   if (state.message && state.mode === "playing") drawToast(state.message);
   if (state.mode === "menu") drawTitleBackdrop();
+
+  // Render transition overlay at the very end of drawing
+  if (state.transition && state.transition.active && state.transition.alpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = state.transition.alpha;
+    ctx.fillStyle = "#e9dfd3";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.restore();
+  }
 }
 
 function drawKitchen() {
@@ -1009,15 +1074,44 @@ function drawToast(text) {
 }
 
 function drawBanner() {
-  const alpha = Math.min(1, state.banner.timer / 0.3, (1.6 - state.banner.timer) / 0.25);
+  if (state.banner.timer <= 0) return;
+
+  const duration = 2.2;
+  const fadeIn = 0.35;
+  const fadeOut = 0.3;
+  const elapsed = duration - state.banner.timer;
+
+  let alpha = 1;
+  if (elapsed < fadeIn) {
+    alpha = elapsed / fadeIn;
+  } else if (state.banner.timer < fadeOut) {
+    alpha = state.banner.timer / fadeOut;
+  }
+
   ctx.save();
-  ctx.globalAlpha = Math.max(0, alpha);
-  ctx.font = "800 22px ui-rounded, system-ui";
-  const metrics = ctx.measureText(state.banner.text);
-  const w = Math.min(WIDTH - 160, metrics.width + 44);
-  roundRect(WIDTH / 2 - w / 2, 108, w, 48, 8, "rgba(255,249,239,0.92)");
-  ctx.fillStyle = "#2d241f";
-  ctx.fillText(state.banner.text, WIDTH / 2 - metrics.width / 2, 139);
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+  const cardW = 480;
+  const cardH = 76;
+  const cardX = WIDTH / 2 - cardW / 2;
+  const cardY = 96;
+
+  roundRect(cardX, cardY, cardW, cardH, 12, "rgba(255, 249, 239, 0.94)");
+  ctx.strokeStyle = "rgba(96, 65, 47, 0.16)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, 12);
+  ctx.stroke();
+
+  ctx.font = "900 18px ui-rounded, system-ui";
+  ctx.fillStyle = "#9b2f45";
+  ctx.textAlign = "center";
+  ctx.fillText(state.banner.title.toUpperCase(), WIDTH / 2, cardY + 28);
+
+  ctx.font = "700 14px ui-rounded, system-ui";
+  ctx.fillStyle = "#60412f";
+  ctx.fillText(state.banner.subtitle, WIDTH / 2, cardY + 54);
+
   ctx.restore();
 }
 
@@ -1310,7 +1404,7 @@ function renderGameToText() {
       lastAudibleNote: audio?.lastAudibleNote || null,
       musicGain: audio ? Number(audio.musicGain.gain.value.toFixed(2)) : 0,
     },
-    banner: state.banner.timer > 0 ? state.banner.text : "",
+    banner: state.banner.timer > 0 ? `${state.banner.title}: ${state.banner.subtitle}` : "",
     particles: state.particles.length,
     level: state.level,
     objective: objectives[state.level],
