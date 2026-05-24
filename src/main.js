@@ -10,11 +10,20 @@ const levelLabel = document.getElementById("level-label");
 const objectiveLabel = document.getElementById("objective-label");
 const scoreLabel = document.getElementById("score-label");
 
+const touchControls = document.getElementById("touch-controls");
+const touchSneak = document.getElementById("touch-sneak");
+const touchPounce = document.getElementById("touch-pounce");
+const joystickBase = document.getElementById("joystick-base");
+const joystickKnob = document.getElementById("joystick-knob");
+const controlsGuide = document.getElementById("controls-guide");
+
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 const CAT_R = 24;
 const keys = new Set();
 const pointer = { x: 0, y: 0, down: false };
+const touchInput = { x: 0, y: 0, sneak: false, pounce: false };
+const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 let audio = null;
 let lastTime = 0;
 let manualClock = false;
@@ -112,6 +121,7 @@ function resetGame() {
   menu.hidden = false;
   ending.hidden = true;
   hud.hidden = true;
+  if (touchControls) touchControls.hidden = true;
   updateHud();
   render();
 }
@@ -123,6 +133,7 @@ function startGame() {
   menu.hidden = true;
   ending.hidden = true;
   hud.hidden = false;
+  if (isTouchDevice && touchControls) touchControls.hidden = false;
   resetLevel(1);
 }
 
@@ -132,6 +143,31 @@ function resetLevel(level) {
   state.message = "";
   state.player.curled = false;
   state.player.pounce = 0;
+
+  // Reset touch inputs and Knob position
+  touchInput.x = 0;
+  touchInput.y = 0;
+  touchInput.sneak = false;
+  touchInput.pounce = false;
+  if (joystickKnob) joystickKnob.style.transform = "translate(0px, 0px)";
+  if (touchSneak) touchSneak.classList.remove("active");
+  if (touchPounce) touchPounce.classList.remove("active");
+
+  // Dynamically show/hide context-specific buttons
+  if (isTouchDevice && touchControls) {
+    touchControls.hidden = false;
+    if (level === 1) {
+      touchSneak?.classList.remove("hidden");
+      touchPounce?.classList.add("hidden");
+    } else if (level === 2) {
+      touchSneak?.classList.add("hidden");
+      touchPounce?.classList.remove("hidden");
+    } else {
+      touchSneak?.classList.add("hidden");
+      touchPounce?.classList.add("hidden");
+    }
+  }
+
   if (level === 1) {
     Object.assign(state.player, makePlayer(100, 400));
     state.kitchen.wake = 0;
@@ -160,6 +196,7 @@ function nextLevel() {
     state.message = "Thank you for being my best friend.";
     ending.hidden = false;
     hud.hidden = true;
+    if (touchControls) touchControls.hidden = true;
     retuneMusic();
     playPurr();
   }
@@ -187,11 +224,20 @@ function readInput() {
   const right = keys.has("arrowright") || keys.has("d");
   const up = keys.has("arrowup") || keys.has("w");
   const down = keys.has("arrowdown") || keys.has("s");
-  const sneak = keys.has("shift") || (state.level === 1 && keys.has("b"));
-  const pounce = keys.has(" ") || keys.has("spacebar");
+  const sneak = keys.has("shift") || (state.level === 1 && keys.has("b")) || touchInput.sneak;
+  const pounce = keys.has(" ") || keys.has("spacebar") || touchInput.pounce;
+
+  let inputX = Number(right) - Number(left);
+  let inputY = Number(down) - Number(up);
+
+  if (touchInput.x !== 0 || touchInput.y !== 0) {
+    inputX = touchInput.x;
+    inputY = touchInput.y;
+  }
+
   return {
-    x: Number(right) - Number(left),
-    y: Number(down) - Number(up),
+    x: inputX,
+    y: inputY,
     sneak,
     pounce,
   };
@@ -209,6 +255,7 @@ function updatePlayer(dt, input) {
     player.pounceCooldown = 0.72;
     player.pounceVx = launchX * 470;
     player.pounceVy = launchY * 470;
+    if (navigator.vibrate) navigator.vibrate(15);
   } else if (pounceStarted && state.level !== 1) {
     player.pounce = 0.22;
   }
@@ -265,6 +312,7 @@ function updateKitchen(dt, input) {
     state.message = "The human stirred. Back to the doorway.";
     Object.assign(state.player, makePlayer(100, 400));
     state.kitchen.wake = 0.18;
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   }
 
   if (dist(state.player, foodBowl) < foodBowl.r + CAT_R) nextLevel();
@@ -303,6 +351,7 @@ function updateLivingRoom(dt) {
     state.livingRoom.captureCooldown = 0.34;
     spawnLaserCatch(dot.x, dot.y);
     Object.assign(state.player, { x: dot.x - 16, y: dot.y + 8, pounce: 0.2 });
+    if (navigator.vibrate) navigator.vibrate(25);
     if (state.livingRoom.caught >= 5) {
       nextLevel();
     } else {
@@ -357,6 +406,7 @@ function updateBedroom(dt) {
   state.bedroom.settled = clamp(state.bedroom.settled + (inSun ? dt : -dt * 0.5), 0, 1.4);
   if (state.bedroom.settled >= 1.2) {
     Object.assign(state.player, { x: patch.x - 10, y: patch.y + 8, vx: 0, vy: 0, curled: true });
+    if (navigator.vibrate) navigator.vibrate(50);
     nextLevel();
   }
 }
@@ -1244,6 +1294,122 @@ canvas.addEventListener("mousedown", (evt) => updatePointerFromEvent(evt, true))
 canvas.addEventListener("mouseup", () => {
   pointer.down = false;
 });
+
+// --- Virtual Joystick and Touch Inputs ---
+let joystickTouchId = null;
+let joystickCenter = { x: 0, y: 0 };
+
+function updateJoystick(touch) {
+  const rect = joystickBase.getBoundingClientRect();
+  const knobRect = joystickKnob.getBoundingClientRect();
+  const maxDisplacement = (rect.width - knobRect.width) / 2 || 30;
+
+  const deltaX = touch.clientX - joystickCenter.x;
+  const deltaY = touch.clientY - joystickCenter.y;
+  const dist = Math.hypot(deltaX, deltaY);
+
+  let targetX = deltaX;
+  let targetY = deltaY;
+
+  if (dist > maxDisplacement) {
+    targetX = (deltaX / dist) * maxDisplacement;
+    targetY = (deltaY / dist) * maxDisplacement;
+  }
+
+  touchInput.x = targetX / maxDisplacement;
+  touchInput.y = targetY / maxDisplacement;
+
+  joystickKnob.style.transform = `translate(${targetX}px, ${targetY}px)`;
+}
+
+if (isTouchDevice && joystickBase && joystickKnob) {
+  document.getElementById("game-shell").classList.add("has-touch-controls");
+
+  if (controlsGuide) {
+    controlsGuide.textContent = "Move: Drag Joystick · Sneak / Pounce: Touch Buttons";
+  }
+
+  joystickBase.addEventListener("touchstart", (evt) => {
+    evt.preventDefault();
+    if (joystickTouchId !== null) return;
+
+    const touch = evt.changedTouches[0];
+    joystickTouchId = touch.identifier;
+
+    joystickBase.classList.add("active");
+
+    const rect = joystickBase.getBoundingClientRect();
+    joystickCenter = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+
+    updateJoystick(touch);
+  }, { passive: false });
+
+  window.addEventListener("touchmove", (evt) => {
+    if (joystickTouchId === null) return;
+
+    for (let i = 0; i < evt.touches.length; i++) {
+      if (evt.touches[i].identifier === joystickTouchId) {
+        evt.preventDefault();
+        updateJoystick(evt.touches[i]);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  const endJoystick = (evt) => {
+    if (joystickTouchId === null) return;
+
+    let ended = false;
+    for (let i = 0; i < evt.changedTouches.length; i++) {
+      if (evt.changedTouches[i].identifier === joystickTouchId) {
+        ended = true;
+        break;
+      }
+    }
+
+    if (ended) {
+      joystickTouchId = null;
+      touchInput.x = 0;
+      touchInput.y = 0;
+      joystickKnob.style.transform = "translate(0px, 0px)";
+      joystickBase.classList.remove("active");
+    }
+  };
+
+  window.addEventListener("touchend", endJoystick);
+  window.addEventListener("touchcancel", endJoystick);
+}
+
+if (isTouchDevice && touchSneak && touchPounce) {
+  touchSneak.addEventListener("touchstart", (evt) => {
+    evt.preventDefault();
+    touchInput.sneak = true;
+    touchSneak.classList.add("active");
+  }, { passive: false });
+
+  const endSneak = (evt) => {
+    touchInput.sneak = false;
+    touchSneak.classList.remove("active");
+  };
+  touchSneak.addEventListener("touchend", endSneak);
+  touchSneak.addEventListener("touchcancel", endSneak);
+
+  touchPounce.addEventListener("touchstart", (evt) => {
+    evt.preventDefault();
+    touchInput.pounce = true;
+    touchPounce.classList.add("active");
+  }, { passive: false });
+
+  const endPounce = (evt) => {
+    touchInput.pounce = false;
+    touchPounce.classList.remove("active");
+  };
+  touchPounce.addEventListener("touchend", endPounce);
+  touchPounce.addEventListener("touchcancel", endPounce);
+}
 
 window.render_game_to_text = renderGameToText;
 window.advanceTime = (ms) => {

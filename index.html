@@ -12,7 +12,22 @@
   </head>
   <body>
     <main id="game-shell" aria-label="Porpeta's Sunny Quest game">
-      <canvas id="game-canvas" width="960" height="540" aria-label="Game playfield"></canvas>
+      <div id="game-container">
+        <canvas id="game-canvas" width="960" height="540" aria-label="Game playfield"></canvas>
+
+        <!-- Virtual Controls for Touch Screens -->
+        <div id="touch-controls" class="touch-controls" hidden>
+          <div id="joystick-container" class="joystick-container">
+            <div id="joystick-base" class="joystick-base">
+              <div id="joystick-knob" class="joystick-knob"></div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="touch-sneak" class="touch-btn sneak-btn" type="button">Sneak</button>
+            <button id="touch-pounce" class="touch-btn pounce-btn" type="button">Pounce</button>
+          </div>
+        </div>
+      </div>
 
       <button id="audio-toggle" class="audio-toggle" type="button" aria-pressed="false">Sound On</button>
 
@@ -33,7 +48,7 @@
         </div>
         <p class="menu-copy">Sneak. Chase the red lights. Nap in the sun.</p>
         <button id="start-btn" type="button">Start</button>
-        <p class="controls">Move: WASD or arrows · Sneak: Shift or B · Pounce: Space · Fullscreen: F</p>
+        <p id="controls-guide" class="controls">Move: WASD or arrows · Sneak: Shift or B · Pounce: Space · Fullscreen: F</p>
       </section>
 
       <div id="hud" class="hud" hidden>
@@ -51,6 +66,16 @@
         <button id="restart-btn" type="button">Play again</button>
       </section>
     </main>
+
+    <!-- Orientation warning for mobile portrait -->
+    <div id="portrait-warning" class="portrait-warning">
+      <div class="warning-content">
+        <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+          <path fill="currentColor" d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
+        </svg>
+        <p>Rotate your device to landscape for the best experience.</p>
+      </div>
+    </div>
 
     <script type="module" src="./src/main.js"></script>
   </body>
