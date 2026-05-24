@@ -331,6 +331,19 @@ h2 {
   transform: scale(0.9);
 }
 
+.meow-btn {
+  background: rgba(215, 129, 67, 0.6);
+  border-color: rgba(215, 129, 67, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.meow-btn.active {
+  background: var(--apricot);
+  border-color: #fff;
+  box-shadow: 0 0 16px rgba(215, 129, 67, 0.6);
+}
+
 .sneak-btn {
   background: rgba(141, 167, 120, 0.6);
   border-color: rgba(141, 167, 120, 0.85);

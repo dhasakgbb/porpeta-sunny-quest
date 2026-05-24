@@ -11,6 +11,7 @@ const objectiveLabel = document.getElementById("objective-label");
 const scoreLabel = document.getElementById("score-label");
 
 const touchControls = document.getElementById("touch-controls");
+const touchMeow = document.getElementById("touch-meow");
 const touchSneak = document.getElementById("touch-sneak");
 const touchPounce = document.getElementById("touch-pounce");
 const joystickBase = document.getElementById("joystick-base");
@@ -68,6 +69,7 @@ function makePlayer(x, y, dir = "right") {
     pounceVy: 0,
     wasPounceInput: false,
     curled: false,
+    meowTimer: 0,
   };
 }
 
@@ -150,12 +152,14 @@ function resetLevel(level) {
   touchInput.sneak = false;
   touchInput.pounce = false;
   if (joystickKnob) joystickKnob.style.transform = "translate(0px, 0px)";
+  if (touchMeow) touchMeow.classList.remove("active");
   if (touchSneak) touchSneak.classList.remove("active");
   if (touchPounce) touchPounce.classList.remove("active");
 
   // Dynamically show/hide context-specific buttons
   if (isTouchDevice && touchControls) {
     touchControls.hidden = false;
+    touchMeow?.classList.remove("hidden");
     if (level === 1) {
       touchSneak?.classList.remove("hidden");
       touchPounce?.classList.add("hidden");
@@ -211,6 +215,7 @@ function update(dt) {
   const input = readInput();
   state.player.pounce = Math.max(0, state.player.pounce - dt);
   state.player.pounceCooldown = Math.max(0, state.player.pounceCooldown - dt);
+  state.player.meowTimer = Math.max(0, state.player.meowTimer - dt);
   updatePlayer(dt, input);
 
   if (state.level === 1) updateKitchen(dt, input);
@@ -768,6 +773,10 @@ function drawCat(player) {
     drawSideCat(player.dir, bob, stride, stretch, lean);
   }
   ctx.restore();
+
+  if (player.meowTimer > 0) {
+    drawMeowBubble(player.x, player.y - 45);
+  }
 }
 
 function drawSideCat(dir, bob, stride, stretch, lean) {
@@ -945,6 +954,32 @@ function drawCurledCat(x, y) {
   ctx.restore();
 }
 
+function drawMeowBubble(x, y) {
+  ctx.save();
+  ctx.font = "800 13px ui-rounded, system-ui";
+  const text = "Meow!";
+  const metrics = ctx.measureText(text);
+  const w = metrics.width + 16;
+  const h = 22;
+
+  // Speech bubble background
+  roundRect(x - w / 2, y - h, w, h, 6, "rgba(255, 255, 255, 0.92)");
+
+  // Speech bubble pointer
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y);
+  ctx.lineTo(x + 4, y);
+  ctx.lineTo(x, y + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Text
+  ctx.fillStyle = "#2d241f";
+  ctx.fillText(text, x - metrics.width / 2, y - 6);
+  ctx.restore();
+}
+
 function drawToast(text) {
   ctx.font = "700 18px ui-rounded, system-ui";
   const metrics = ctx.measureText(text);
@@ -1109,6 +1144,84 @@ function setAudioMuted(nextMuted) {
     audioToggle.textContent = audioMuted ? "Sound Off" : "Sound On";
   }
   audioToggle.setAttribute("aria-pressed", String(audioMuted));
+}
+
+function playMeowSound() {
+  const setup = ensureAudio();
+  if (!setup || audioMuted) return;
+  const ac = setup.ctx;
+  if (ac.state !== "running") return;
+
+  const now = ac.currentTime;
+
+  const osc1 = ac.createOscillator();
+  const osc2 = ac.createOscillator();
+  const gainNode = ac.createGain();
+  const filterNode = ac.createBiquadFilter();
+
+  osc1.type = "triangle";
+  osc2.type = "sawtooth";
+
+  osc1.frequency.setValueAtTime(320, now);
+  osc1.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+  osc1.frequency.exponentialRampToValueAtTime(650, now + 0.18);
+  osc1.frequency.exponentialRampToValueAtTime(380, now + 0.4);
+
+  osc2.frequency.setValueAtTime(325, now);
+  osc2.frequency.exponentialRampToValueAtTime(785, now + 0.08);
+  osc2.frequency.exponentialRampToValueAtTime(655, now + 0.18);
+  osc2.frequency.exponentialRampToValueAtTime(385, now + 0.4);
+
+  filterNode.type = "bandpass";
+  filterNode.Q.value = 1.8;
+  filterNode.frequency.setValueAtTime(500, now);
+  filterNode.frequency.exponentialRampToValueAtTime(1400, now + 0.1);
+  filterNode.frequency.exponentialRampToValueAtTime(800, now + 0.22);
+  filterNode.frequency.exponentialRampToValueAtTime(450, now + 0.4);
+
+  gainNode.gain.setValueAtTime(0.0001, now);
+  gainNode.gain.linearRampToValueAtTime(0.08, now + 0.05);
+  gainNode.gain.exponentialRampToValueAtTime(0.04, now + 0.2);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+
+  osc1.connect(filterNode);
+  osc2.connect(filterNode);
+  filterNode.connect(gainNode);
+  gainNode.connect(setup.master);
+
+  osc1.start(now);
+  osc2.start(now);
+  osc1.stop(now + 0.45);
+  osc2.stop(now + 0.45);
+}
+
+function triggerMeow() {
+  state.player.meowTimer = 0.65;
+  playMeowSound();
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  const player = state.player;
+  for (let i = 0; i < 4; i++) {
+    state.particles.push({
+      x: player.x + (Math.random() - 0.5) * 30,
+      y: player.y - 20 + (Math.random() - 0.5) * 15,
+      vx: (Math.random() - 0.5) * 50,
+      vy: -40 - Math.random() * 40,
+      life: 0.5 + Math.random() * 0.35,
+      maxLife: 0.85,
+      color: Math.random() > 0.5 ? "#f5b1a4" : "#fff2d4",
+    });
+  }
+
+  // Easter egg: meowing wakes up the human if you are inside the danger zone!
+  if (state.level === 1) {
+    const human = state.kitchen.human;
+    const humanCenter = { x: human.x + human.w / 2, y: human.y + human.h / 2 };
+    const distance = dist(state.player, humanCenter);
+    if (distance < human.danger) {
+      state.kitchen.wake = Math.min(1.0, state.kitchen.wake + 0.55);
+    }
+  }
 }
 
 function playPurr() {
@@ -1280,6 +1393,10 @@ window.addEventListener("keydown", (evt) => {
     else document.getElementById("game-shell").requestFullscreen?.();
     return;
   }
+  if (key === "m") {
+    triggerMeow();
+    return;
+  }
   keys.add(key);
 });
 
@@ -1396,7 +1513,19 @@ if (isTouchDevice && joystickBase && joystickKnob) {
   window.addEventListener("touchcancel", endJoystick);
 }
 
-if (isTouchDevice && touchSneak && touchPounce) {
+if (isTouchDevice && touchSneak && touchPounce && touchMeow) {
+  touchMeow.addEventListener("touchstart", (evt) => {
+    evt.preventDefault();
+    triggerMeow();
+    touchMeow.classList.add("active");
+  }, { passive: false });
+
+  const endMeow = (evt) => {
+    touchMeow.classList.remove("active");
+  };
+  touchMeow.addEventListener("touchend", endMeow);
+  touchMeow.addEventListener("touchcancel", endMeow);
+
   touchSneak.addEventListener("touchstart", (evt) => {
     evt.preventDefault();
     touchInput.sneak = true;
