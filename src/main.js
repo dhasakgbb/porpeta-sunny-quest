@@ -518,6 +518,8 @@ function updateBedroom(dt) {
       maxLife: 4.0,
       r: 1.2 + Math.random() * 1.8, // small, delicate dust mote radius
       color: `rgba(255, 235, 149, ${0.12 + Math.random() * 0.18})`,
+      swaySpeed: 0.8 + Math.random() * 1.2,
+      spawnTime: state.time,
     });
   }
 
@@ -728,8 +730,31 @@ function drawSleepingHuman(human, wake) {
   ctx.fill();
 
   drawSleepLetters(bedX + bedW - 42, bedY - 20, wake);
-  ctx.fillStyle = "#9b2f45";
-  ctx.fillRect(human.x, human.y + human.h + 12, human.w * wake, 7);
+
+  // Cozy rounded wake meter container
+  const barX = human.x;
+  const barY = human.y + human.h + 12;
+  const barW = human.w;
+  const barH = 10;
+  roundRect(barX, barY, barW, barH, 5, "rgba(55, 37, 24, 0.12)"); // container background
+
+  // Rounded gradient alert bar filling
+  if (wake > 0) {
+    const fillW = barW * wake;
+    const meterGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    meterGrad.addColorStop(0, "#d78143"); // orange
+    meterGrad.addColorStop(1, "#9b2f45"); // red
+    roundRect(barX, barY, fillW, barH, 5, meterGrad);
+  }
+
+  // Waking warning notification
+  if (wake > 0.58) {
+    ctx.font = "900 11px ui-rounded, system-ui";
+    ctx.fillStyle = "#9b2f45";
+    ctx.textAlign = "center";
+    ctx.fillText("AWAKENING!", barX + barW / 2, barY - 4);
+  }
+
   ctx.restore();
 }
 
@@ -786,6 +811,35 @@ function drawPlant(x, y) {
   }
 }
 
+function drawLaserPointerDevice(dot) {
+  const emitterX = WIDTH - 36;
+  const emitterY = 104;
+  const angle = Math.atan2(dot.y - emitterY, dot.x - emitterX);
+  ctx.save();
+  ctx.translate(emitterX, emitterY);
+  ctx.rotate(angle);
+
+  // Draw mounting base (attached to the side wall)
+  ctx.fillStyle = "#456f94"; // matches blue counters/accents
+  ctx.beginPath();
+  ctx.arc(-8, 0, 14, -Math.PI / 2, Math.PI / 2);
+  ctx.fill();
+
+  // Draw laser barrel
+  ctx.fillStyle = "#705747";
+  roundRect(-10, -5, 24, 10, 3, "#705747");
+  ctx.fillStyle = "#d78143"; // gold accent tip
+  ctx.fillRect(10, -5, 4, 10);
+
+  // Little lens indicator
+  ctx.fillStyle = "#e12634";
+  ctx.beginPath();
+  ctx.arc(14, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function drawLaserDot(dot, sparkle) {
   const pulse = 1 + Math.sin(state.time * 12) * 0.18 + sparkle * 0.8;
   ctx.strokeStyle = "rgba(225,38,52,0.18)";
@@ -805,6 +859,9 @@ function drawLaserDot(dot, sparkle) {
   ctx.beginPath();
   ctx.arc(dot.x, dot.y, 8 * pulse, 0, Math.PI * 2);
   ctx.fill();
+
+  // Draw physical emitter device
+  drawLaserPointerDevice(dot);
   ctx.strokeStyle = "rgba(225,38,52,0.7)";
   ctx.lineWidth = 2;
   ctx.beginPath();
