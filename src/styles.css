@@ -490,5 +490,52 @@ h2 {
   100% { transform: rotate(0deg); }
 }
 
+@media (max-height: 480px) {
+  .panel {
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 12px 20px;
+    width: min(480px, calc(100vw - 16px));
+  }
+
+  .panel h1 {
+    font-size: 1.6rem !important;
+    margin-bottom: 0.3rem !important;
+  }
+
+  .panel h2 {
+    font-size: 1.3rem !important;
+    margin-bottom: 0.6rem !important;
+  }
+
+  .panel .eyebrow {
+    font-size: 0.65rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+
+  .panel .title-video-frame {
+    display: none !important;
+  }
+
+  .panel .menu-copy {
+    font-size: 0.8rem !important;
+    margin-bottom: 0.6rem !important;
+  }
+
+  .panel button {
+    padding: 0.42rem 0.85rem !important;
+    font-size: 0.84rem !important;
+    box-shadow: 0 4px 10px rgba(91, 28, 43, 0.16) !important;
+  }
+
+  .panel .controls {
+    font-size: 0.7rem !important;
+    margin-top: 0.4rem !important;
+  }
+}
+
+
 
 

@@ -418,6 +418,25 @@ function updateBedroom(dt) {
   const ny = (state.player.y - patch.y) / patch.ry;
   const inSun = nx * nx + ny * ny < 1;
   state.bedroom.settled = clamp(state.bedroom.settled + (inSun ? dt : -dt * 0.5), 0, 1.4);
+
+  // Ambient golden dust motes in sunbeam
+  if (Math.random() < 0.16) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = Math.random();
+    const px = patch.x + Math.cos(angle) * patch.rx * r;
+    const py = patch.y + Math.sin(angle) * patch.ry * r;
+    state.particles.push({
+      x: px + (Math.random() - 0.5) * 12,
+      y: py - 10 - Math.random() * 20,
+      vx: (Math.random() - 0.5) * 6,
+      vy: 3 + Math.random() * 8, // drifts slowly downwards
+      life: 2.0 + Math.random() * 2.0,
+      maxLife: 4.0,
+      r: 1.2 + Math.random() * 1.8, // small, delicate dust mote radius
+      color: `rgba(255, 235, 149, ${0.12 + Math.random() * 0.18})`,
+    });
+  }
+
   if (state.bedroom.settled >= 1.2) {
     Object.assign(state.player, { x: patch.x - 10, y: patch.y + 8, vx: 0, vy: 0, curled: true });
     if (navigator.vibrate) navigator.vibrate(50);
@@ -1008,7 +1027,8 @@ function drawParticles() {
     ctx.globalAlpha = alpha;
     ctx.fillStyle = particle.color;
     ctx.beginPath();
-    ctx.arc(particle.x, particle.y, 3 + alpha * 3, 0, Math.PI * 2);
+    const r = particle.r !== undefined ? particle.r * alpha : 3 + alpha * 3;
+    ctx.arc(particle.x, particle.y, r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -1042,7 +1062,19 @@ function ensureAudio() {
   master.gain.value = audioMuted ? 0 : 0.9;
   musicGain.gain.value = 0.32;
   purrGain.gain.value = 0.06;
+
+  // Immersive Delay effect for warm, ambient acoustic melodies
+  const delay = ctx.createDelay(1.0);
+  const delayFeedback = ctx.createGain();
+  delay.delayTime.value = 0.43; // Match sequencer beat speed
+  delayFeedback.gain.value = 0.36; // 36% feedback decay
+
   musicGain.connect(master);
+  musicGain.connect(delay);
+  delay.connect(delayFeedback);
+  delayFeedback.connect(delay);
+  delay.connect(master);
+
   purrGain.connect(master);
   master.connect(ctx.destination);
   audio = { ctx, master, musicGain, purrGain, purrNodes: [], music: null, lastNote: null, lastAudibleNote: null };
