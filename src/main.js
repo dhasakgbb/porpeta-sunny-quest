@@ -417,6 +417,7 @@ function updateKitchen(dt, input) {
 
   if (state.kitchen.wake >= 1) {
     state.message = "The human stirred. Back to the doorway.";
+    playWarningSound();
     const startX = manualClock ? 100 : 140;
     const startY = manualClock ? 400 : 240;
     Object.assign(state.player, makePlayer(startX, startY));
@@ -424,7 +425,10 @@ function updateKitchen(dt, input) {
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   }
 
-  if (dist(state.player, foodBowl) < foodBowl.r + CAT_R) nextLevel();
+  if (dist(state.player, foodBowl) < foodBowl.r + CAT_R) {
+    playEatSound();
+    nextLevel();
+  }
 }
 
 function updateLivingRoom(dt) {
@@ -456,6 +460,7 @@ function updateLivingRoom(dt) {
   const canCapture = state.livingRoom.captureCooldown <= 0;
   if (canCapture && ((catIsPouncing && distanceToCat < CAT_R + dot.r + 12) || pointerCatch(dot))) {
     state.livingRoom.caught += 1;
+    playLaserCatchSound();
     state.livingRoom.sparkle = 0.38;
     state.livingRoom.captureCooldown = 0.34;
     spawnLaserCatch(dot.x, dot.y);
@@ -1449,6 +1454,91 @@ function setAudioMuted(nextMuted) {
     audioToggle.textContent = audioMuted ? "Sound Off" : "Sound On";
   }
   audioToggle.setAttribute("aria-pressed", String(audioMuted));
+}
+
+function playWarningSound() {
+  const setup = ensureAudio();
+  if (!setup || audioMuted) return;
+  const ac = setup.ctx;
+  if (ac.state === "suspended") ac.resume();
+  if (ac.state !== "running") return;
+
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gainNode = ac.createGain();
+
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(140, now);
+  osc.frequency.linearRampToValueAtTime(70, now + 0.5);
+
+  gainNode.gain.setValueAtTime(0.08, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+  const filter = ac.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(180, now);
+
+  osc.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(setup.master);
+
+  osc.start(now);
+  osc.stop(now + 0.5);
+}
+
+function playLaserCatchSound() {
+  const setup = ensureAudio();
+  if (!setup || audioMuted) return;
+  const ac = setup.ctx;
+  if (ac.state === "suspended") ac.resume();
+  if (ac.state !== "running") return;
+
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gainNode = ac.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(580, now);
+  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.12);
+
+  gainNode.gain.setValueAtTime(0.06, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+  osc.connect(gainNode);
+  gainNode.connect(setup.master);
+
+  osc.start(now);
+  osc.stop(now + 0.12);
+}
+
+function playEatSound() {
+  const setup = ensureAudio();
+  if (!setup || audioMuted) return;
+  const ac = setup.ctx;
+  if (ac.state === "suspended") ac.resume();
+  if (ac.state !== "running") return;
+
+  const now = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gainNode = ac.createGain();
+
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.setValueAtTime(80, now + 0.08);
+
+  gainNode.gain.setValueAtTime(0.08, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+  const filter = ac.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(350, now);
+
+  osc.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(setup.master);
+
+  osc.start(now);
+  osc.stop(now + 0.16);
 }
 
 function playMeowSound() {
