@@ -522,6 +522,11 @@ h2 {
 }
 
 @media (max-height: 480px) {
+  #game-shell {
+    min-height: 116vh !important;
+    padding-bottom: 90px !important;
+  }
+
   .panel {
     top: 50%;
     transform: translate(-50%, -50%);
