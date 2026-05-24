@@ -1150,6 +1150,7 @@ function playMeowSound() {
   const setup = ensureAudio();
   if (!setup || audioMuted) return;
   const ac = setup.ctx;
+  if (ac.state === "suspended") ac.resume();
   if (ac.state !== "running") return;
 
   const now = ac.currentTime;
