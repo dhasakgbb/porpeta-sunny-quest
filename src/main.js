@@ -106,10 +106,15 @@ const objectives = {
   3: "Rest in the warm sun patch.",
 };
 
+function setGameMode(mode) {
+  state.mode = mode;
+  document.documentElement.classList.toggle("game-scrollable", mode !== "playing");
+}
+
 function resetGame() {
   stopPurr();
   retuneMusic();
-  state.mode = "menu";
+  setGameMode("menu");
   state.level = 1;
   state.message = "";
   state.banner = { title: "", subtitle: "", timer: 0 };
@@ -135,7 +140,7 @@ function resetGame() {
 function startGame() {
   ensureAudio();
   startMusic();
-  state.mode = "playing";
+  setGameMode("playing");
   menu.hidden = true;
   ending.hidden = true;
   hud.hidden = false;
@@ -160,7 +165,7 @@ function resetLevel(level) {
 
 function executeResetLevel(level) {
   state.level = level;
-  state.mode = "playing";
+  setGameMode("playing");
   state.message = "";
   state.player.curled = false;
   state.player.pounce = 0;
@@ -230,7 +235,7 @@ function nextLevel() {
 }
 
 function executeEndingTransition() {
-  state.mode = "ending";
+  setGameMode("ending");
   state.player.curled = true;
   state.message = "Thank you for being my best friend.";
   ending.hidden = false;

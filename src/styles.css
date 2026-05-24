@@ -27,6 +27,18 @@ body {
     BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Enable page-level scrolling in non-gameplay states (e.g. menus) on small viewports */
+.game-scrollable,
+.game-scrollable body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.game-scrollable #game-shell {
+  min-height: 100vh;
+  height: auto;
+}
+
 button {
   border: 0;
   border-radius: 8px;
