@@ -576,6 +576,17 @@ h2 {
     font-size: 0.7rem !important;
     margin-top: 0.4rem !important;
   }
+
+  .game-scrollable .panel {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    margin: 16px auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    box-shadow: 0 8px 32px rgba(55, 37, 24, 0.15) !important;
+  }
 }
 
 #start-btn {
