@@ -97,6 +97,7 @@ const state = {
     sunPatch: { x: 700, y: 280, rx: 128, ry: 78 },
     settled: 0,
   },
+  menuCatMeowTimer: 0,
 };
 
 const objectives = {
@@ -122,6 +123,7 @@ function resetGame() {
   state.livingRoom.captureCooldown = 0;
   state.livingRoom.sparkle = 0;
   state.bedroom.settled = 0;
+  state.menuCatMeowTimer = 0;
   menu.hidden = false;
   ending.hidden = true;
   hud.hidden = true;
@@ -263,6 +265,27 @@ function update(dt) {
       if (state.transition.alpha <= 0) {
         state.transition.active = false;
       }
+    }
+  }
+
+  if (state.mode === "menu") {
+    state.menuCatMeowTimer = Math.max(0, state.menuCatMeowTimer - dt);
+
+    // Spawn a floating gold dust particle occasionally
+    if (state.particles.length < 40 && Math.random() < 0.12) {
+      state.particles.push({
+        x: Math.random() * WIDTH,
+        y: HEIGHT + 10,
+        vx: (Math.random() - 0.5) * 8,
+        vy: -(10 + Math.random() * 15), // rise slowly
+        life: 3.5 + Math.random() * 3.5,
+        maxLife: 7.0,
+        r: 1.0 + Math.random() * 2.0,
+        color: `rgba(255, 235, 149, ${0.12 + Math.random() * 0.18})`,
+        swaySpeed: 0.5 + Math.random() * 1.5,
+        swayAmount: 10 + Math.random() * 15,
+        spawnTime: state.time,
+      });
     }
   }
 
@@ -453,10 +476,15 @@ function spawnLaserCatch(x, y) {
 function updateParticles(dt) {
   for (const particle of state.particles) {
     particle.life -= dt;
-    particle.x += particle.vx * dt;
-    particle.y += particle.vy * dt;
-    particle.vx *= 1 - dt * 2.2;
-    particle.vy *= 1 - dt * 2.2;
+    if (particle.swaySpeed) {
+      particle.y += particle.vy * dt;
+      particle.x += particle.vx * dt + Math.sin((state.time + particle.spawnTime) * particle.swaySpeed) * 0.35;
+    } else {
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      particle.vx *= 1 - dt * 2.2;
+      particle.vy *= 1 - dt * 2.2;
+    }
   }
   state.particles = state.particles.filter((particle) => particle.life > 0);
 }
@@ -521,6 +549,17 @@ function resolveKitchenHumanCollision() {
 
 function render() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  if (state.mode === "menu") {
+    drawTitleBackdrop();
+    if (state.transition && state.transition.active && state.transition.alpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = state.transition.alpha;
+      ctx.fillStyle = "#e9dfd3";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.restore();
+    }
+    return;
+  }
   if (state.level === 1) drawKitchen();
   if (state.level === 2) drawLivingRoom();
   if (state.level === 3) drawBedroom();
@@ -528,7 +567,6 @@ function render() {
   drawCat(state.player);
   if (state.banner.timer > 0 && state.mode === "playing") drawBanner();
   if (state.message && state.mode === "playing") drawToast(state.message);
-  if (state.mode === "menu") drawTitleBackdrop();
 
   // Render transition overlay at the very end of drawing
   if (state.transition && state.transition.active && state.transition.alpha > 0) {
@@ -1129,8 +1167,76 @@ function drawParticles() {
 }
 
 function drawTitleBackdrop() {
-  ctx.fillStyle = "rgba(255,248,234,0.24)";
+  // 1. Cozy room backdrop (vertical gradient)
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+  bgGrad.addColorStop(0, "#f4e8dd"); // warm walls
+  bgGrad.addColorStop(1, "#cbb8a4"); // baseboard/floor line
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // 2. Floorboards (bottom third of screen)
+  const floorY = HEIGHT - 180;
+  ctx.fillStyle = "#e8dcd0"; // wood flooring
+  ctx.fillRect(0, floorY, WIDTH, HEIGHT - floorY);
+
+  // Draw floor divider (baseboard)
+  ctx.fillStyle = "rgba(255,255,255,0.24)";
+  ctx.fillRect(0, floorY - 8, WIDTH, 8);
+  ctx.fillStyle = "rgba(45,36,31,0.08)";
+  ctx.fillRect(0, floorY, WIDTH, 4);
+
+  // Floorboard lines
+  ctx.strokeStyle = "rgba(94, 68, 51, 0.08)";
+  ctx.lineWidth = 2.5;
+  for (let y = floorY + 30; y < HEIGHT; y += 42) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(WIDTH, y + Math.sin(y) * 4);
+    ctx.stroke();
+  }
+
+  // 3. Cozy rug
+  const rugX = WIDTH / 2;
+  const rugY = HEIGHT - 92;
+  drawRug(rugX - 170, rugY - 45, 340, 90, "#456f94", "#f0d59c");
+
+  // 4. Curled sleeping cat on the rug with breathing animation
+  ctx.save();
+  ctx.translate(rugX, rugY - 14);
+  const breath = 1.0 + Math.sin(state.time * 1.5) * 0.024;
+  ctx.scale(breath, breath);
+  drawCurledCat(0, 0);
+  ctx.restore();
+
+  // 5. Speech bubble if menu meow timer is active
+  if (state.menuCatMeowTimer > 0) {
+    drawMeowBubble(rugX, rugY - 72);
+  }
+
+  // 6. Swaying sunbeams
+  ctx.save();
+  const swayAngle = Math.sin(state.time * 0.35) * 0.015;
+  ctx.translate(-50, -50); // upper left sunbeam source
+  ctx.rotate(0.35 + swayAngle); // base angle pointing diagonally down
+
+  // Volumetric sunbeam shaft
+  const beamGrad = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT * 0.8);
+  beamGrad.addColorStop(0, "rgba(255, 238, 160, 0.44)");
+  beamGrad.addColorStop(0.4, "rgba(255, 225, 120, 0.16)");
+  beamGrad.addColorStop(1, "rgba(255, 225, 120, 0.0)");
+
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(240, 0);
+  ctx.lineTo(WIDTH + 300, HEIGHT + 100);
+  ctx.lineTo(WIDTH - 150, HEIGHT + 100);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 7. Title particles (gold dust motes)
+  drawParticles();
 }
 
 function updateHud() {
@@ -1538,8 +1644,23 @@ function updatePointerFromEvent(evt, down = pointer.down) {
 
 canvas.addEventListener("pointermove", (evt) => updatePointerFromEvent(evt));
 
+function handleTitleCatClick() {
+  if (state.mode === "menu") {
+    const rugX = WIDTH / 2;
+    const rugY = HEIGHT - 92;
+    const catX = rugX;
+    const catY = rugY - 14;
+    const d = Math.hypot(pointer.x - catX, pointer.y - catY);
+    if (d < 65) {
+      playMeowSound();
+      state.menuCatMeowTimer = 0.65;
+    }
+  }
+}
+
 canvas.addEventListener("pointerdown", (evt) => {
   updatePointerFromEvent(evt, true);
+  handleTitleCatClick();
 });
 
 canvas.addEventListener("pointerup", () => {
@@ -1547,7 +1668,10 @@ canvas.addEventListener("pointerup", () => {
 });
 
 canvas.addEventListener("mousemove", (evt) => updatePointerFromEvent(evt));
-canvas.addEventListener("mousedown", (evt) => updatePointerFromEvent(evt, true));
+canvas.addEventListener("mousedown", (evt) => {
+  updatePointerFromEvent(evt, true);
+  handleTitleCatClick();
+});
 canvas.addEventListener("mouseup", () => {
   pointer.down = false;
 });
