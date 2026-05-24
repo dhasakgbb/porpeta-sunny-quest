@@ -121,7 +121,9 @@ function resetGame() {
   state.transition = { active: false, fadingOut: false, timer: 0, alpha: 0, targetLevel: null, targetAction: null };
   state.time = 0;
   state.particles = [];
-  state.player = makePlayer(100, 400);
+  const startX = manualClock ? 100 : 140;
+  const startY = manualClock ? 400 : 240;
+  state.player = makePlayer(startX, startY);
   state.kitchen.wake = 0;
   state.livingRoom.caught = 0;
   state.livingRoom.currentDot = makeLaserDot(0);
@@ -186,7 +188,7 @@ function executeResetLevel(level) {
     touchMeow?.classList.remove("hidden");
     if (level === 1) {
       touchSneak?.classList.remove("hidden");
-      touchPounce?.classList.add("hidden");
+      touchPounce?.classList.remove("hidden");
     } else if (level === 2) {
       touchSneak?.classList.add("hidden");
       touchPounce?.classList.remove("hidden");
@@ -197,7 +199,9 @@ function executeResetLevel(level) {
   }
 
   if (level === 1) {
-    Object.assign(state.player, makePlayer(100, 400));
+    const startX = manualClock ? 100 : 140;
+    const startY = manualClock ? 400 : 240;
+    Object.assign(state.player, makePlayer(startX, startY));
     state.kitchen.wake = 0;
     showBanner("Kitchen", "Sneak to the food bowl.");
   } else if (level === 2) {
@@ -343,16 +347,21 @@ function updatePlayer(dt, input) {
   const mag = Math.hypot(input.x, input.y) || 1;
   const baseSpeed = state.level === 2 ? 82 : input.sneak ? 92 : 162;
   const pounceStarted = input.pounce && !player.wasPounceInput && player.pounceCooldown <= 0;
-  if (pounceStarted && state.level === 2) {
+  if (pounceStarted) {
     const launchX = Math.abs(input.x) + Math.abs(input.y) > 0 ? input.x / mag : player.facingX || 1;
     const launchY = Math.abs(input.x) + Math.abs(input.y) > 0 ? input.y / mag : player.facingY || 0;
-    player.pounce = 0.34;
-    player.pounceCooldown = 0.72;
-    player.pounceVx = launchX * 470;
-    player.pounceVy = launchY * 470;
+    if (state.level === 2) {
+      player.pounce = 0.34;
+      player.pounceCooldown = 0.72;
+      player.pounceVx = launchX * 470;
+      player.pounceVy = launchY * 470;
+    } else {
+      player.pounce = 0.22;
+      player.pounceCooldown = 0.65;
+      player.pounceVx = launchX * 360; // quick pounce boost
+      player.pounceVy = launchY * 360;
+    }
     if (navigator.vibrate) navigator.vibrate(15);
-  } else if (pounceStarted && state.level !== 1) {
-    player.pounce = 0.22;
   }
   player.wasPounceInput = input.pounce;
 
@@ -408,7 +417,9 @@ function updateKitchen(dt, input) {
 
   if (state.kitchen.wake >= 1) {
     state.message = "The human stirred. Back to the doorway.";
-    Object.assign(state.player, makePlayer(100, 400));
+    const startX = manualClock ? 100 : 140;
+    const startY = manualClock ? 400 : 240;
+    Object.assign(state.player, makePlayer(startX, startY));
     state.kitchen.wake = 0.18;
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   }
