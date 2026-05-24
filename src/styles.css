@@ -404,7 +404,24 @@ h2 {
   bottom: auto;
   top: clamp(74px, 11vh, 86px);
   right: clamp(16px, 3vw, 32px);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: var(--ink);
+  min-width: 90px;
+  padding: 0.42rem 0.55rem;
+  font-size: 0.76rem;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(55, 37, 24, 0.15);
+  transition: transform 0.1s ease, background 0.15s ease;
 }
+
+.has-touch-controls .audio-toggle:active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
 
 .portrait-warning {
   display: none;

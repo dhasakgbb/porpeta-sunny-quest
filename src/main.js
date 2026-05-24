@@ -230,9 +230,15 @@ function readInput() {
   let inputX = Number(right) - Number(left);
   let inputY = Number(down) - Number(up);
 
-  if (touchInput.x !== 0 || touchInput.y !== 0) {
-    inputX = touchInput.x;
-    inputY = touchInput.y;
+  // Apply a smooth deadzone mapping to virtual touch controls
+  const touchMag = Math.hypot(touchInput.x, touchInput.y);
+  if (touchMag > 0.15) {
+    const scale = (touchMag - 0.15) / (1.0 - 0.15);
+    inputX = (touchInput.x / touchMag) * scale;
+    inputY = (touchInput.y / touchMag) * scale;
+  } else if (touchInput.x !== 0 || touchInput.y !== 0) {
+    inputX = 0;
+    inputY = 0;
   }
 
   return {
@@ -263,8 +269,11 @@ function updatePlayer(dt, input) {
 
   player.pounceVx *= Math.exp(-dt * 5.2);
   player.pounceVy *= Math.exp(-dt * 5.2);
-  player.vx = (input.x / mag) * baseSpeed + player.pounceVx;
-  player.vy = (input.y / mag) * baseSpeed + player.pounceVy;
+
+  // Proportional analog speed scaling (min/max 1.0 for keyboard)
+  const speedScale = Math.min(1, Math.hypot(input.x, input.y));
+  player.vx = (input.x / mag) * baseSpeed * speedScale + player.pounceVx;
+  player.vy = (input.y / mag) * baseSpeed * speedScale + player.pounceVy;
   updatePlayerFacing(player, input, dt);
 
   const next = { x: player.x + player.vx * dt, y: player.y + player.vy * dt };
@@ -1094,7 +1103,11 @@ function playMusicNote() {
 function setAudioMuted(nextMuted) {
   audioMuted = nextMuted;
   if (audio?.master) audio.master.gain.value = audioMuted ? 0 : 0.9;
-  audioToggle.textContent = audioMuted ? "Sound Off" : "Sound On";
+  if (isTouchDevice) {
+    audioToggle.textContent = audioMuted ? "🔇 Muted" : "🔊 Sound";
+  } else {
+    audioToggle.textContent = audioMuted ? "Sound Off" : "Sound On";
+  }
   audioToggle.setAttribute("aria-pressed", String(audioMuted));
 }
 
@@ -1420,7 +1433,11 @@ window.advanceTime = (ms) => {
 };
 window.__ricardoGame = { state, resetGame, startGame, resetLevel, nextLevel };
 
-audioToggle.textContent = "Sound On";
+if (isTouchDevice) {
+  audioToggle.textContent = "🔊 Sound";
+} else {
+  audioToggle.textContent = "Sound On";
+}
 audioToggle.setAttribute("aria-pressed", "false");
 resetGame();
 requestAnimationFrame(frame);
